@@ -37,19 +37,19 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen p-4">
+<body class="bg-slate-100 text-slate-800 p-2 sm:p-4">
 
-    <div class="w-full max-w-5xl mx-auto bg-white rounded-xl shadow-2xl p-6 md:p-8 space-y-4">
+    <div class="w-full max-w-7xl mx-auto bg-white rounded-xl shadow-2xl flex flex-col h-[95vh] p-4 sm:p-6">
         <!-- Header -->
-        <header class="text-center pb-2 border-b">
-            <h1 class="text-2xl font-bold text-slate-900">Audio Archive Tool</h1>
-            <p class="text-sm text-slate-500">Create and manage deflated audio archives and manifests</p>
+        <header class="text-center pb-2 border-b flex-shrink-0">
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Archive Tool</h1>
+            <p class="text-xs sm:text-sm text-slate-500">Create deflated archives and TS manifests</p>
         </header>
 
         <!-- Main Content Area -->
-        <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <main class="flex-grow flex flex-col md:flex-row gap-6 pt-4 overflow-hidden">
             <!-- Left Panel: File Contents and Loading -->
-            <div id="load-drop-zone" class="bg-slate-50 p-4 rounded-lg h-[60vh] flex flex-col transition-all">
+            <div id="load-drop-zone" class="bg-slate-50 p-2 sm:p-4 rounded-lg flex flex-col transition-all md:w-3/5 lg:w-2/3 h-1/2 md:h-full">
                 <h2 class="text-lg font-semibold mb-2 text-slate-700 flex-shrink-0">File Contents</h2>
                 <div class="overflow-y-auto file-list flex-grow">
                     <ul id="file-list" class="space-y-3 p-1">
@@ -59,9 +59,9 @@
             </div>
 
             <!-- Right Panel: Add and Generate -->
-            <div class="space-y-4 flex flex-col">
+            <div class="space-y-4 flex flex-col md:w-2/5 lg:w-1/3 h-1/2 md:h-full">
                  <!-- Add New Item Drop Zone -->
-                <div id="add-drop-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer transition-all h-64 flex flex-col items-center justify-center">
+                <div id="add-drop-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center flex-grow">
                      <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -73,14 +73,14 @@
                 </div>
 
                  <!-- Action Button -->
-                <div class="flex-grow flex items-end">
+                <div class="flex-shrink-0">
                     <button id="generate-button" class="w-full bg-slate-800 text-white font-bold py-3 px-4 rounded-md hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                         Generate & Download ZIP
                     </button>
                 </div>
                 
                  <!-- Status Message -->
-                <div id="status-message" class="text-center text-sm p-2 rounded-md min-h-[36px]"></div>
+                <div id="status-message" class="text-center text-sm p-2 rounded-md min-h-[36px] flex-shrink-0"></div>
             </div>
         </main>
     </div>
@@ -101,7 +101,7 @@
             // --- UI Rendering ---
             const renderFileList = () => {
                 if (fileContents.length === 0) {
-                    fileList.innerHTML = `<li class="text-center text-slate-500 pt-8">Drop an existing 'archive.deflated' file on this panel to load it, or add new audio files on the right.</li>`;
+                    fileList.innerHTML = `<li class="text-center text-slate-500 p-4 sm:pt-8">Drop an 'archive.deflated' file on this panel to load it, or add new files on the right.</li>`;
                     generateButton.disabled = true;
                     return;
                 }
@@ -137,12 +137,12 @@
             
             const showStatus = (message, type = 'success') => {
                 statusMessage.textContent = message;
-                statusMessage.className = `text-center text-sm p-2 rounded-md min-h-[36px] transition-all ${
+                statusMessage.className = `text-center text-sm p-2 rounded-md min-h-[36px] transition-all flex-shrink-0 ${
                     type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`;
                 setTimeout(() => {
                     statusMessage.textContent = '';
-                    statusMessage.className = 'text-center text-sm p-2 rounded-md min-h-[36px]';
+                    statusMessage.className = 'text-center text-sm p-2 rounded-md min-h-[36px] flex-shrink-0';
                 }, 4000);
             };
 
@@ -288,7 +288,7 @@
                     reader.onload = (event) => {
                         try {
                             // Try to inflate. If it works, it's an archive.
-                            pako.inflate(event.target.result, { to: 'string' });
+                            pako.inflate(new Uint8Array(event.target.result), { to: 'string' });
                             // It was inflatable! So, treat it as an archive to load.
                             showStatus(`Loading detected archive: ${file.name}`, 'success');
                             inflateFile(file);
