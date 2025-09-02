@@ -8,46 +8,29 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- pako.js for compression/decompression -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <!-- JSZip for creating zip files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        /* Custom styles for a better look and feel */
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .drop-zone-active {
-            background-color: #e0f2fe; /* light-blue-100 */
-            border-color: #0284c7; /* light-blue-600 */
-        }
-        /* Simple transition for UI elements */
-        .transition-all {
-            transition: all 0.3s ease-in-out;
-        }
-        /* Custom scrollbar for the file list */
-        .file-list::-webkit-scrollbar {
-            width: 8px;
-        }
-        .file-list::-webkit-scrollbar-track {
-            background: #f1f5f9; /* slate-100 */
-        }
-        .file-list::-webkit-scrollbar-thumb {
-            background: #94a3b8; /* slate-400 */
-            border-radius: 4px;
-        }
-        .file-list::-webkit-scrollbar-thumb:hover {
-            background: #64748b; /* slate-500 */
-        }
-        .file-list-item-content {
-            max-height: 100px;
-            overflow-y: auto;
-            word-break: break-all;
-            font-family: monospace;
-            font-size: 0.8rem;
-            background-color: #f8fafc;
+        body { font-family: 'Inter', sans-serif; }
+        .drop-zone-active { background-color: #e0f2fe; border-color: #0284c7; }
+        .transition-all { transition: all 0.3s ease-in-out; }
+        .file-list::-webkit-scrollbar { width: 8px; }
+        .file-list::-webkit-scrollbar-track { background: #f1f5f9; }
+        .file-list::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        .file-list::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        audio { filter: sepia(20%) saturate(70%) grayscale(1) contrast(99%) hue-rotate(10deg); }
+        .editable-input {
+            width: 100%;
             padding: 4px 6px;
             border-radius: 4px;
-            margin-top: 4px;
+            border: 1px solid transparent;
+            background-color: #f8fafc;
         }
-        audio {
-            filter: sepia(20%) saturate(70%) grayscale(1) contrast(99%) hue-rotate(10deg);
+        .editable-input:hover, .editable-input:focus {
+            border-color: #cbd5e1;
+            background-color: white;
+            outline: 2px solid transparent;
+            outline-offset: 2px;
         }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,65 +39,46 @@
 </head>
 <body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-2xl p-6 md:p-8 space-y-6">
+    <div class="w-full max-w-5xl mx-auto bg-white rounded-xl shadow-2xl p-6 md:p-8 space-y-4">
         <!-- Header -->
-        <header class="text-center">
-            <h1 class="text-3xl font-bold text-slate-900">File Inflate & Deflate Tool</h1>
-            <p class="text-slate-500 mt-2">Powered by <a href="https://github.com/nodeca/pako" target="_blank" class="text-cyan-600 hover:underline">pako.js</a></p>
+        <header class="text-center pb-2 border-b">
+            <h1 class="text-2xl font-bold text-slate-900">Audio Archive Tool</h1>
+            <p class="text-sm text-slate-500">Create and manage deflated audio archives and manifests</p>
         </header>
 
         <!-- Main Content Area -->
         <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <!-- Left Panel: File Handling and List -->
-            <div class="space-y-4">
-                <!-- Drop Zone -->
-                <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer transition-all">
-                    <svg class="mx-auto h-12 w-12 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                    <p class="mt-2 text-slate-600">
-                        <span class="font-semibold text-cyan-600">Drag & drop</span> a deflated file here
-                    </p>
-                    <p class="text-xs text-slate-500 mt-1">or click to select a file</p>
-                    <input type="file" id="file-input" class="hidden">
-                </div>
-
-                <!-- File List -->
-                <div class="bg-slate-50 p-4 rounded-lg h-96 overflow-y-auto file-list">
-                    <h2 class="text-lg font-semibold mb-2 text-slate-700">File Contents</h2>
-                    <ul id="file-list" class="space-y-3">
-                        <li class="text-center text-slate-500 pt-8">No file loaded yet.</li>
+            <!-- Left Panel: File Contents and Loading -->
+            <div id="load-drop-zone" class="bg-slate-50 p-4 rounded-lg h-[60vh] flex flex-col transition-all">
+                <h2 class="text-lg font-semibold mb-2 text-slate-700 flex-shrink-0">File Contents</h2>
+                <div class="overflow-y-auto file-list flex-grow">
+                    <ul id="file-list" class="space-y-3 p-1">
+                        <!-- Content rendered here -->
                     </ul>
                 </div>
             </div>
 
-            <!-- Right Panel: Add/Edit and Actions -->
+            <!-- Right Panel: Add and Generate -->
             <div class="space-y-4 flex flex-col">
-                 <!-- Add New Item Form -->
-                <form id="add-item-form" class="bg-slate-50 p-4 rounded-lg">
-                    <h2 class="text-lg font-semibold mb-3 text-slate-700">Add New Item</h2>
-                    <div class="space-y-4">
-                        <div>
-                            <label for="item-name" class="block text-sm font-medium text-slate-700">Item Name (ID)</label>
-                            <input type="text" id="item-name" placeholder="e.g., sound_effect_1" required class="mt-1 w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
-                        </div>
-                        <div>
-                             <label for="item-audio-file" class="block text-sm font-medium text-slate-700">Audio File</label>
-                             <input type="file" id="item-audio-file" accept="audio/*" required class="mt-1 w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer">
-                        </div>
-                        <button type="submit" class="w-full bg-cyan-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 transition-all">
-                            Add Item
-                        </button>
-                    </div>
-                </form>
+                 <!-- Add New Item Drop Zone -->
+                <div id="add-drop-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer transition-all h-64 flex flex-col items-center justify-center">
+                     <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="mt-2 text-slate-600">
+                        <span class="font-semibold text-cyan-600">Drag & drop files</span> here to add
+                    </p>
+                    <p class="text-xs text-slate-500 mt-1">or click to select files</p>
+                    <input type="file" id="add-file-input" class="hidden" multiple>
+                </div>
 
                  <!-- Action Button -->
                 <div class="flex-grow flex items-end">
-                    <button id="deflate-button" class="w-full bg-slate-800 text-white font-bold py-3 px-4 rounded-md hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        Deflate & Download File
+                    <button id="generate-button" class="w-full bg-slate-800 text-white font-bold py-3 px-4 rounded-md hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Generate & Download ZIP
                     </button>
                 </div>
-
+                
                  <!-- Status Message -->
                 <div id="status-message" class="text-center text-sm p-2 rounded-md min-h-[36px]"></div>
             </div>
@@ -124,58 +88,53 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // State
-            let fileContents = [];
-            let sourceFormat = 'nameContent'; // 'nameContent' or 'idData'
+            let fileContents = []; // { uiId, key, filename, content }
 
             // DOM Elements
-            const dropZone = document.getElementById('drop-zone');
-            const fileInput = document.getElementById('file-input');
+            const loadDropZone = document.getElementById('load-drop-zone');
+            const addDropZone = document.getElementById('add-drop-zone');
+            const addFileInput = document.getElementById('add-file-input');
             const fileList = document.getElementById('file-list');
-            const addItemForm = document.getElementById('add-item-form');
-            const itemNameInput = document.getElementById('item-name');
-            const deflateButton = document.getElementById('deflate-button');
+            const generateButton = document.getElementById('generate-button');
             const statusMessage = document.getElementById('status-message');
 
             // --- UI Rendering ---
             const renderFileList = () => {
-                fileList.innerHTML = ''; // Clear the list
                 if (fileContents.length === 0) {
-                    fileList.innerHTML = '<li class="text-center text-slate-500 pt-8">No file loaded or list is empty.</li>';
-                    deflateButton.disabled = true;
+                    fileList.innerHTML = `<li class="text-center text-slate-500 pt-8">Drop an existing 'archive.deflated' file on this panel to load it, or add new audio files on the right.</li>`;
+                    generateButton.disabled = true;
                     return;
                 }
+                fileList.innerHTML = ''; // Clear the list
 
                 fileContents.forEach(item => {
                     const li = document.createElement('li');
-                    li.className = 'bg-white p-3 rounded-md shadow-sm';
-
-                    // Heuristic to decide if content is base64 audio vs. other text
-                    const isLikelyBase64 = item.content.length > 200 && !item.content.trim().startsWith('{');
+                    li.className = 'bg-white p-3 rounded-md shadow-sm space-y-2';
                     const audioSrc = `data:audio/mpeg;base64,${item.content}`;
 
                     li.innerHTML = `
-                        <div class="flex items-center justify-between">
-                            <span class="truncate text-slate-700 font-medium" title="${item.name}">${item.name}</span>
-                            <button data-id="${item.id}" class="remove-btn text-red-500 hover:text-red-700 p-1 rounded-full transition-colors flex-shrink-0">
+                        <div class="grid grid-cols-5 gap-2 items-center">
+                            <label class="text-xs font-medium text-slate-500 text-right col-span-1">Key</label>
+                            <input type="text" value="${item.key}" data-id="${item.uiId}" data-field="key" class="editable-input col-span-4" title="SoundKey for the manifest">
+                        </div>
+                        <div class="grid grid-cols-5 gap-2 items-center">
+                             <label class="text-xs font-medium text-slate-500 text-right col-span-1">Filename</label>
+                            <input type="text" value="${item.filename}" data-id="${item.uiId}" data-field="filename" class="editable-input col-span-4" title="Filename used as the 'id' in the archive">
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <audio controls class="w-full mr-2" style="height: 30px;"><source src="${audioSrc}"></audio>
+                            <button data-id="${item.uiId}" class="remove-btn text-red-500 hover:text-red-700 p-1 rounded-full transition-colors flex-shrink-0">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l-1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                                 </svg>
                             </button>
                         </div>
-                        ${isLikelyBase64 ? `
-                        <audio controls class="w-full mt-2" style="height: 40px;">
-                            <source src="${audioSrc}" type="audio/mpeg">
-                            Your browser does not support the audio element.
-                        </audio>
-                        ` : `
-                        <div class="file-list-item-content text-slate-600">${item.content}</div>
-                        `}
                     `;
                     fileList.appendChild(li);
                 });
-                deflateButton.disabled = false;
+                generateButton.disabled = false;
             };
-
+            
             const showStatus = (message, type = 'success') => {
                 statusMessage.textContent = message;
                 statusMessage.className = `text-center text-sm p-2 rounded-md min-h-[36px] transition-all ${
@@ -193,162 +152,174 @@
                 reader.onload = (event) => {
                     try {
                         const inflatedData = pako.inflate(event.target.result, { to: 'string' });
+                        const parsedData = JSON.parse(inflatedData);
 
-                        let parsedData;
-                        let isStructured = false;
-                        let structureType = null;
-
-                        try {
-                            parsedData = JSON.parse(inflatedData);
-                            if (Array.isArray(parsedData) && parsedData.length > 0) {
-                                const firstItem = parsedData[0];
-                                if (typeof firstItem === 'object' && firstItem !== null) {
-                                    if ('name' in firstItem && 'content' in firstItem) {
-                                        isStructured = true;
-                                        structureType = 'nameContent';
-                                    } else if ('id' in firstItem && 'data' in firstItem) {
-                                        isStructured = true;
-                                        structureType = 'idData';
-                                    }
-                                }
-                            }
-                        } catch (e) { /* Not a recognized structure. */ }
-
-                        if (isStructured) {
-                             sourceFormat = structureType; // Remember the format for saving
-                             if (structureType === 'idData') {
-                                // Map from {id, data} to the tool's internal {name, content} format
-                                fileContents = parsedData.map(item => ({
-                                    name: item.id,
-                                    content: item.data,
-                                    id: Date.now() + Math.random() // Internal unique ID for UI
-                                }));
-                            } else { // 'nameContent'
-                                fileContents = parsedData.map(item => ({...item, id: Date.now() + Math.random()}));
-                            }
-                            showStatus('File archive loaded successfully!', 'success');
-                        } else {
-                            // The file is a simple deflated string (text, JSON, etc.)
-                            sourceFormat = 'nameContent';
-                            const fileName = file.name.replace(/\.deflated$|\.gz$/, '') || 'single-file.txt';
-                            fileContents = [{ name: fileName, content: inflatedData, id: Date.now() }];
-                            showStatus(`Loaded "${fileName}" as a single file.`, 'success');
+                        if (!Array.isArray(parsedData) || !(parsedData.length === 0 || ('id' in parsedData[0] && 'data' in parsedData[0]))) {
+                            throw new Error("Invalid archive format. Expected array of {id, data}.");
                         }
+                        
+                        fileContents = parsedData.map(item => ({
+                            uiId: Date.now() + Math.random(),
+                            key: item.id,      // Default key to the id
+                            filename: item.id, // Filename is the id
+                            content: item.data
+                        }));
 
                         renderFileList();
-
-                    } catch (pakoError) {
-                        console.error('Inflation Error:', pakoError);
-                        showStatus(`Error inflating file: ${pakoError.message}`, 'error');
-                        fileContents = [];
+                        showStatus('Archive loaded successfully!', 'success');
+                    } catch (err) {
+                        console.error('Inflation Error:', err);
+                        showStatus(`Error loading archive: ${err.message}`, 'error');
                         renderFileList();
                     }
                 };
-                reader.onerror = () => { showStatus('Failed to read the file.', 'error'); };
+                reader.onerror = () => showStatus('Failed to read the file.', 'error');
                 reader.readAsArrayBuffer(file);
             };
 
-            const deflateAndDownload = () => {
+            const addFilesToList = (files) => {
+                let filesAdded = 0;
+                const filesToProcess = Array.from(files);
+
+                filesToProcess.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const base64Content = event.target.result.split(',')[1];
+                        const filenameWithoutExt = file.name.includes('.') ? file.name.split('.').slice(0, -1).join('.') : file.name;
+                        
+                        fileContents.push({
+                            uiId: Date.now() + Math.random(),
+                            key: filenameWithoutExt,
+                            filename: filenameWithoutExt,
+                            content: base64Content
+                        });
+
+                        filesAdded++;
+                        if (filesAdded === filesToProcess.length) {
+                             renderFileList();
+                             showStatus(`${filesAdded} file(s) added successfully.`, 'success');
+                        }
+                    };
+                    reader.onerror = () => showStatus(`Failed to read file: ${file.name}`, 'error');
+                    reader.readAsDataURL(file);
+                });
+            };
+            
+            const generateAndDownloadZip = async () => {
                 if (fileContents.length === 0) {
-                    showStatus('Cannot deflate an empty list.', 'error');
+                    showStatus('Cannot generate from an empty list.', 'error');
                     return;
                 }
-
+                
                 try {
-                    let dataToDeflate;
-                    // Convert back to original format if it was id/data
-                    if (sourceFormat === 'idData') {
-                        dataToDeflate = fileContents.map(({ name, content }) => ({ id: name, data: content }));
-                    } else {
-                        // Otherwise, use the tool's native name/content format
-                        dataToDeflate = fileContents.map(({ name, content }) => ({ name, content }));
-                    }
+                    const zip = new JSZip();
 
+                    // 1. Generate Manifest File
+                    const keys = fileContents.map(item => `'${item.key}'`);
+                    const filenames = fileContents.map(item => `  ${item.key}: '${item.filename}'`);
+                    const manifestContent = `export const soundKeys = [\n  ${keys.join(',\n  ')},\n] as const\n\nexport type SoundKey = (typeof soundKeys)[number]\n\nexport const soundFilenames = {\n${filenames.join(',\n')},\n} as const satisfies Record<SoundKey, string>\n`;
+                    zip.file("sound_manifest.ts", manifestContent);
+                    
+                    // 2. Generate Deflated Archive
+                    const dataToDeflate = fileContents.map(({ filename, content }) => ({ id: filename, data: content }));
                     const jsonString = JSON.stringify(dataToDeflate);
                     const deflatedData = pako.deflate(jsonString);
-
-                    const blob = new Blob([deflatedData], { type: 'application/octet-stream' });
-                    const url = URL.createObjectURL(blob);
-
+                    zip.file("archive.deflated", deflatedData);
+                    
+                    // 3. Create and Download ZIP
+                    const zipBlob = await zip.generateAsync({ type: "blob" });
+                    const url = URL.createObjectURL(zipBlob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'archive.deflated';
+                    a.download = 'sound_archive.zip';
                     document.body.appendChild(a);
-a.click();
+                    a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
-
-                    showStatus('File deflated and download started.', 'success');
+                    
+                    showStatus('ZIP file generated and download started.', 'success');
                 } catch (error) {
-                    console.error('Deflation Error:', error);
-                    showStatus('An error occurred during deflation.', 'error');
+                    console.error('Generation Error:', error);
+                    showStatus('An error occurred during file generation.', 'error');
                 }
             };
 
             // --- Event Handlers ---
-            const handleAddItem = (e) => {
-                e.preventDefault();
-                const name = itemNameInput.value.trim();
-                const audioFileInput = document.getElementById('item-audio-file');
-                const file = audioFileInput.files[0];
-
-                if (name && file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const base64Content = event.target.result.split(',')[1];
-                        if (base64Content) {
-                            fileContents.push({ id: Date.now(), name, content: base64Content });
-                            renderFileList();
-                            addItemForm.reset();
-                            showStatus(`Item "${name}" added.`, 'success');
-                        } else {
-                            showStatus('Could not read file content.', 'error');
-                        }
-                    };
-                    reader.onerror = () => { showStatus('Failed to read the file.', 'error'); };
-                    reader.readAsDataURL(file);
-                } else {
-                    showStatus('Both a name and an audio file are required.', 'error');
-                }
-            };
-
-            const handleRemoveItem = (e) => {
-                if (e.target.closest('.remove-btn')) {
-                    const button = e.target.closest('.remove-btn');
-                    const idToRemove = Number(button.dataset.id);
-                    const itemToRemove = fileContents.find(item => item.id === idToRemove);
-                    fileContents = fileContents.filter(item => item.id !== idToRemove);
-                    renderFileList();
-                    if(itemToRemove) {
-                        showStatus(`Item "${itemToRemove.name}" removed.`, 'success');
+            const handleUpdateItem = (e) => {
+                const target = e.target;
+                if (target.classList.contains('editable-input')) {
+                    const uiId = Number(target.dataset.id);
+                    const field = target.dataset.field;
+                    const item = fileContents.find(i => i.uiId === uiId);
+                    if (item) {
+                        item[field] = target.value;
                     }
                 }
             };
+            
+            const handleRemoveItem = (e) => {
+                const button = e.target.closest('.remove-btn');
+                if (button) {
+                    const uiIdToRemove = Number(button.dataset.id);
+                    fileContents = fileContents.filter(item => item.uiId !== uiIdToRemove);
+                    renderFileList();
+                    showStatus(`Item removed.`, 'success');
+                }
+            };
+            
+            // --- Drop Zone Event Listeners ---
+            const setupDropZone = (element, onDrop) => {
+                element.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); element.classList.add('drop-zone-active'); });
+                element.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); element.classList.remove('drop-zone-active'); });
+                element.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    element.classList.remove('drop-zone-active');
+                    if (e.dataTransfer.files?.length) {
+                        onDrop(e.dataTransfer.files);
+                    }
+                });
+            };
 
-            // --- Drag and Drop Event Listeners ---
-            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drop-zone-active'); });
-            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drop-zone-active'); });
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dropZone.classList.remove('drop-zone-active');
-                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    inflateFile(e.dataTransfer.files[0]);
-                    e.dataTransfer.clearData();
+            const handleDroppedFilesOnAddPanel = (files) => {
+                if (files.length === 1) {
+                    const file = files[0];
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            // Try to inflate. If it works, it's an archive.
+                            pako.inflate(event.target.result, { to: 'string' });
+                            // It was inflatable! So, treat it as an archive to load.
+                            showStatus(`Loading detected archive: ${file.name}`, 'success');
+                            inflateFile(file);
+                        } catch (err) {
+                            // It's not a valid pako archive, so add it as a regular file.
+                            addFilesToList([file]);
+                        }
+                    };
+                    reader.onerror = () => showStatus(`Failed to read file: ${file.name}`, 'error');
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    // Multiple files, just add them all.
+                    addFilesToList(files);
+                }
+            };
+
+            setupDropZone(loadDropZone, (files) => inflateFile(files[0]));
+            setupDropZone(addDropZone, handleDroppedFilesOnAddPanel);
+
+            addDropZone.addEventListener('click', () => addFileInput.click());
+            addFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleDroppedFilesOnAddPanel(e.target.files);
                 }
             });
-
-            // Click to upload
-            dropZone.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', (e) => {
-                if(e.target.files.length > 0) { inflateFile(e.target.files[0]); }
-            });
-
+            
             // Other Event Listeners
-            addItemForm.addEventListener('submit', handleAddItem);
+            fileList.addEventListener('input', handleUpdateItem);
             fileList.addEventListener('click', handleRemoveItem);
-            deflateButton.addEventListener('click', deflateAndDownload);
-
+            generateButton.addEventListener('click', generateAndDownloadZip);
+            
             // Initial render
             renderFileList();
         });
