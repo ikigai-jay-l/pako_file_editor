@@ -43,7 +43,7 @@
         <!-- Header -->
         <header class="text-center pb-2 border-b flex-shrink-0">
             <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Archive Tool</h1>
-            <p class="text-xs sm:text-sm text-slate-500">Create deflated archives and TS manifests</p>
+            <p class="text-xs sm:text-sm text-slate-500">Create deflated archives and manifests</p>
         </header>
 
         <!-- Main Content Area -->
@@ -88,7 +88,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // State
-            let fileContents = []; // { uiId, key, filename, content }
+            let fileContents = []; // { uiId, filename, content }
 
             // DOM Elements
             const loadDropZone = document.getElementById('load-drop-zone');
@@ -113,13 +113,9 @@
                     const audioSrc = `data:audio/mpeg;base64,${item.content}`;
 
                     li.innerHTML = `
-                        <div class="grid grid-cols-5 gap-2 items-center">
-                            <label class="text-xs font-medium text-slate-500 text-right col-span-1">Key</label>
-                            <input type="text" value="${item.key}" data-id="${item.uiId}" data-field="key" class="editable-input col-span-4" title="SoundKey for the manifest">
-                        </div>
-                        <div class="grid grid-cols-5 gap-2 items-center">
-                             <label class="text-xs font-medium text-slate-500 text-right col-span-1">Filename</label>
-                            <input type="text" value="${item.filename}" data-id="${item.uiId}" data-field="filename" class="editable-input col-span-4" title="Filename used as the 'id' in the archive">
+                        <div class="flex items-center gap-2">
+                             <label class="text-xs font-medium text-slate-500 flex-shrink-0">Filename</label>
+                            <input type="text" value="${item.filename}" data-id="${item.uiId}" data-field="filename" class="editable-input w-full" title="Filename used as the 'id' in the archive">
                         </div>
                         <div class="flex items-center justify-between pt-1">
                             <audio controls class="w-full mr-2" style="height: 30px;"><source src="${audioSrc}"></audio>
@@ -151,7 +147,7 @@
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     try {
-                        const inflatedData = pako.inflate(event.target.result, { to: 'string' });
+                        const inflatedData = pako.inflate(new Uint8Array(event.target.result), { to: 'string' });
                         const parsedData = JSON.parse(inflatedData);
 
                         if (!Array.isArray(parsedData) || !(parsedData.length === 0 || ('id' in parsedData[0] && 'data' in parsedData[0]))) {
@@ -160,7 +156,6 @@
                         
                         fileContents = parsedData.map(item => ({
                             uiId: Date.now() + Math.random(),
-                            key: item.id,      // Default key to the id
                             filename: item.id, // Filename is the id
                             content: item.data
                         }));
@@ -189,7 +184,6 @@
                         
                         fileContents.push({
                             uiId: Date.now() + Math.random(),
-                            key: filenameWithoutExt,
                             filename: filenameWithoutExt,
                             content: base64Content
                         });
@@ -214,17 +208,17 @@
                 try {
                     const zip = new JSZip();
 
-                    // 1. Generate Manifest File
-                    const keys = fileContents.map(item => `'${item.key}'`);
-                    const filenames = fileContents.map(item => `  ${item.key}: '${item.filename}'`);
-                    const manifestContent = `export const soundKeys = [\n  ${keys.join(',\n  ')},\n] as const\n\nexport type SoundKey = (typeof soundKeys)[number]\n\nexport const soundFilenames = {\n${filenames.join(',\n')},\n} as const satisfies Record<SoundKey, string>\n`;
-                    zip.file("sound_manifest.ts", manifestContent);
+                    // 1. Generate Manifest File as a plain text list of filenames
+                    const manifestContent = fileContents
+                        .map(item => item.filename)
+                        .join('\n');
+                    zip.file("sound_manifest.txt", manifestContent);
                     
                     // 2. Generate Deflated Archive
                     const dataToDeflate = fileContents.map(({ filename, content }) => ({ id: filename, data: content }));
                     const jsonString = JSON.stringify(dataToDeflate);
                     const deflatedData = pako.deflate(jsonString);
-                    zip.file("archive.deflated", deflatedData);
+                    zip.file("sound.json", deflatedData);
                     
                     // 3. Create and Download ZIP
                     const zipBlob = await zip.generateAsync({ type: "blob" });
